@@ -1,0 +1,28 @@
+# Ignore local build directories
+target/
+build/
+.mvn/wrapper/*.jar
+
+# Ignore version control and IDE files
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Ignore local configuration and secrets
+.env
+.env.*
+secrets/
+credentials/
+*.pem
+*.key
+
+# Ignore documentation and markdown files
+*.md
+docs/
+
+# Ignore log files
+*.log
