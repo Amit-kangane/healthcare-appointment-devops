@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: healthcare-appointment-devops
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+# Spring Boot Actuator & Prometheus Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# Application Metadata exposed via /actuator/info
+info:
+  app:
+    name: "Healthcare Appointment Management System"
+    description: "End-to-End DevOps Pipeline Project"
+    version: "1.0.0"
+    java-version: "21"
+    maintainer: "DevOps Engineering Team"

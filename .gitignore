@@ -1,0 +1,51 @@
+# Compiled Java / Maven target artifacts
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Package managers and caches
+.mvn/timing.properties
+.flattened-pom.xml
+
+# IDE & Editor files
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache
+.apt_generated
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and runtime dumps
+*.log
+*.dump
+*.dumpstream
+
+# Environment variables & Secrets (CRITICAL: Never commit to Git)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+credentials/
+secrets/
+kubeconfig
