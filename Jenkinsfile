@@ -26,11 +26,17 @@ pipeline {
         stage('Initialize & Inspect') {
             steps {
                 script {
-                    // Extract short Git commit hash for immutable versioning
+                    // Ensure Maven Wrapper has executable permissions on Linux agents
                     if (isUnix()) {
-                        IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                        sh 'chmod +x ./mvnw'
+                    }
+                    // Extract short Git commit hash for immutable versioning
+                    if (env.GIT_COMMIT) {
+                        env.IMAGE_TAG = env.GIT_COMMIT.take(7)
+                    } else if (isUnix()) {
+                        env.IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     } else {
-                        IMAGE_TAG = bat(script: "@git rev-parse --short HEAD", returnStdout: true).trim()
+                        env.IMAGE_TAG = bat(script: '@git rev-parse --short HEAD', returnStdout: true).trim()
                     }
                     echo "=========================================================="
                     echo "BUILDING PIPELINE FOR: ${env.APP_NAME}"
@@ -92,12 +98,12 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo "Building Docker image with immutable tag: ${DOCKER_REPO}:${IMAGE_TAG} and latest..."
+                echo "Building Docker image with immutable tag: ${env.DOCKER_REPO}:${env.IMAGE_TAG} and latest..."
                 script {
                     if (isUnix()) {
-                        sh "docker build -t ${DOCKER_REPO}:${IMAGE_TAG} -t ${DOCKER_REPO}:latest ."
+                        sh "docker build -t ${env.DOCKER_REPO}:${env.IMAGE_TAG} -t ${env.DOCKER_REPO}:latest ."
                     } else {
-                        bat "docker build -t ${DOCKER_REPO}:${IMAGE_TAG} -t ${DOCKER_REPO}:latest ."
+                        bat "docker build -t ${env.DOCKER_REPO}:${env.IMAGE_TAG} -t ${env.DOCKER_REPO}:latest ."
                     }
                 }
             }
@@ -113,13 +119,13 @@ pipeline {
                     script {
                         if (isUnix()) {
                             sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-                            sh "docker push ${DOCKER_REPO}:${IMAGE_TAG}"
-                            sh "docker push ${DOCKER_REPO}:latest"
+                            sh "docker push ${env.DOCKER_REPO}:${env.IMAGE_TAG}"
+                            sh "docker push ${env.DOCKER_REPO}:latest"
                             sh 'docker logout'
                         } else {
                             bat 'echo %DOCKER_PASS% | docker login -u "%DOCKER_USER%" --password-stdin'
-                            bat "docker push ${DOCKER_REPO}:${IMAGE_TAG}"
-                            bat "docker push ${DOCKER_REPO}:latest"
+                            bat "docker push ${env.DOCKER_REPO}:${env.IMAGE_TAG}"
+                            bat "docker push ${env.DOCKER_REPO}:latest"
                             bat 'docker logout'
                         }
                     }
@@ -129,20 +135,20 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo "Updating Kubernetes deployment '${K8S_DEPLOYMENT_NAME}' to image ${DOCKER_REPO}:${IMAGE_TAG}..."
+                echo "Updating Kubernetes deployment '${env.K8S_DEPLOYMENT_NAME}' to image ${env.DOCKER_REPO}:${env.IMAGE_TAG}..."
                 // Authenticates to Kubernetes cluster using Jenkins Secret File or Kubeconfig
-                withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
+                withCredentials([file(credentialsId: "${env.KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
                     script {
                         if (isUnix()) {
-                            sh "kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE}"
-                            sh "kubectl apply -f k8s/service.yaml -n ${K8S_NAMESPACE}"
-                            sh "kubectl apply -f k8s/hpa.yaml -n ${K8S_NAMESPACE}"
-                            sh "kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${DOCKER_REPO}:${IMAGE_TAG} -n ${K8S_NAMESPACE}"
+                            sh "kubectl apply -f k8s/deployment.yaml -n ${env.K8S_NAMESPACE}"
+                            sh "kubectl apply -f k8s/service.yaml -n ${env.K8S_NAMESPACE}"
+                            sh "kubectl apply -f k8s/hpa.yaml -n ${env.K8S_NAMESPACE}"
+                            sh "kubectl set image deployment/${env.K8S_DEPLOYMENT_NAME} ${env.K8S_DEPLOYMENT_NAME}=${env.DOCKER_REPO}:${env.IMAGE_TAG} -n ${env.K8S_NAMESPACE}"
                         } else {
-                            bat "kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE}"
-                            bat "kubectl apply -f k8s/service.yaml -n ${K8S_NAMESPACE}"
-                            bat "kubectl apply -f k8s/hpa.yaml -n ${K8S_NAMESPACE}"
-                            bat "kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${DOCKER_REPO}:${IMAGE_TAG} -n ${K8S_NAMESPACE}"
+                            bat "kubectl apply -f k8s/deployment.yaml -n ${env.K8S_NAMESPACE}"
+                            bat "kubectl apply -f k8s/service.yaml -n ${env.K8S_NAMESPACE}"
+                            bat "kubectl apply -f k8s/hpa.yaml -n ${env.K8S_NAMESPACE}"
+                            bat "kubectl set image deployment/${env.K8S_DEPLOYMENT_NAME} ${env.K8S_DEPLOYMENT_NAME}=${env.DOCKER_REPO}:${env.IMAGE_TAG} -n ${env.K8S_NAMESPACE}"
                         }
                     }
                 }
@@ -183,7 +189,7 @@ pipeline {
         success {
             echo "=================================================================="
             echo "PIPELINE COMPLETED SUCCESSFULLY!"
-            echo "Application version '${IMAGE_TAG}' is running in Kubernetes."
+            echo "Application version '${env.IMAGE_TAG}' is running in Kubernetes."
             echo "=================================================================="
         }
         failure {
