@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: healthcare-app
-          image: healthcare-appointment:local
+          image: amitkangane/healthcare-appointment-devops:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
