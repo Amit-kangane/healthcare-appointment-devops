@@ -11,7 +11,7 @@ pipeline {
         // Application Metadata
         APP_NAME = 'healthcare-appointment-devops'
         K8S_NAMESPACE = 'healthcare'
-        K8S_DEPLOYMENT_NAME = 'healthcare-appointment'
+        K8S_DEPLOYMENT_NAME = 'healthcare-app'
 
         // Container Registry Configuration (Uses Jenkins Credentials - NO hardcoded secrets)
         DOCKER_REGISTRY = 'docker.io'
@@ -135,9 +135,13 @@ pipeline {
                 withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
                     script {
                         if (isUnix()) {
-                            sh "kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${DOCKER_REPO}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record=true"
+                            sh "kubectl apply -f k8s/namespace.yaml"
+                            sh "kubectl apply -f k8s/ -n ${K8S_NAMESPACE}"
+                            sh "kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${DOCKER_REPO}:${IMAGE_TAG} -n ${K8S_NAMESPACE}"
                         } else {
-                            bat "kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${DOCKER_REPO}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record=true"
+                            bat "kubectl apply -f k8s/namespace.yaml"
+                            bat "kubectl apply -f k8s/ -n ${K8S_NAMESPACE}"
+                            bat "kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${DOCKER_REPO}:${IMAGE_TAG} -n ${K8S_NAMESPACE}"
                         }
                     }
                 }

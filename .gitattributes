@@ -1,0 +1,22 @@
+# Auto-detect text files and normalize line endings on checkout/commit
+* text=auto
+
+# Enforce LF line endings for Unix shell scripts and wrapper
+mvnw text eol=lf
+*.sh text eol=lf
+
+# Enforce LF line endings for Maven Wrapper configuration and downloader
+.mvn/wrapper/maven-wrapper.properties text eol=lf
+.mvn/wrapper/MavenWrapperDownloader.java text eol=lf
+
+# Enforce LF line endings for Docker and CI/CD configurations
+Dockerfile text eol=lf
+Jenkinsfile text eol=lf
+k8s/*.yaml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Enforce CRLF line endings for Windows batch scripts
+mvnw.cmd text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
