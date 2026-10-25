@@ -14,12 +14,12 @@ pipeline {
 
         // Container Registry Configuration (Uses Jenkins Credentials - NO hardcoded secrets)
         DOCKER_REGISTRY = 'docker.io'
-        DOCKER_REPO = 'amitkangane/healthcare-appointment-devops'
+        DOCKER_REPO = 'amitkangane2005/healthcare-appointment-devops'
         DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
         KUBECONFIG_CREDENTIALS_ID = 'k8s-kubeconfig'
 
-        // Immutable Tag using short Git Commit SHA
-        IMAGE_TAG = ""
+        // Default immutable tag using Jenkins build number (guaranteed non-null)
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -30,18 +30,38 @@ pipeline {
                     if (isUnix()) {
                         sh 'chmod +x ./mvnw'
                     }
-                    // Extract short Git commit hash for immutable versioning
-                    if (env.GIT_COMMIT) {
-                        env.IMAGE_TAG = env.GIT_COMMIT.take(7)
-                    } else if (isUnix()) {
-                        env.IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    } else {
-                        env.IMAGE_TAG = bat(script: '@git rev-parse --short HEAD', returnStdout: true).trim()
+
+                    // Extract short Git commit hash if available, with safe fallback to BUILD_NUMBER
+                    def tag = ''
+                    try {
+                        if (env.GIT_COMMIT) {
+                            tag = env.GIT_COMMIT.take(7)
+                        } else if (isUnix()) {
+                            def gitCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            if (gitCommit) {
+                                tag = gitCommit
+                            }
+                        } else {
+                            def raw = bat(script: '@git rev-parse --short HEAD', returnStdout: true).trim()
+                            def lines = raw.readLines().collect { it.trim() }.findAll { !it.isEmpty() }
+                            if (lines) {
+                                tag = lines[-1]
+                            }
+                        }
+                    } catch (Exception e) {
+                        echo "Notice: Git commit could not be determined (${e.message}). Falling back to BUILD_NUMBER."
                     }
+
+                    if (!tag || tag == 'null' || tag.trim() == '') {
+                        tag = env.BUILD_NUMBER ?: 'latest'
+                    }
+
+                    env.IMAGE_TAG = tag
+
                     echo "=========================================================="
                     echo "BUILDING PIPELINE FOR: ${env.APP_NAME}"
                     echo "GIT BRANCH:            ${env.BRANCH_NAME ?: 'main'}"
-                    echo "GIT COMMIT SHA (TAG):  ${env.IMAGE_TAG}"
+                    echo "IMAGE TAG:             ${env.IMAGE_TAG}"
                     echo "TARGET REGISTRY IMAGE: ${env.DOCKER_REPO}:${env.IMAGE_TAG}"
                     echo "=========================================================="
                 }
@@ -98,8 +118,11 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo "Building Docker image with immutable tag: ${env.DOCKER_REPO}:${env.IMAGE_TAG} and latest..."
                 script {
+                    if (!env.IMAGE_TAG || env.IMAGE_TAG == 'null' || env.IMAGE_TAG.trim() == '') {
+                        env.IMAGE_TAG = env.BUILD_NUMBER ?: 'latest'
+                    }
+                    echo "Building Docker image with immutable tag: ${env.DOCKER_REPO}:${env.IMAGE_TAG} and latest..."
                     if (isUnix()) {
                         sh "docker build -t ${env.DOCKER_REPO}:${env.IMAGE_TAG} -t ${env.DOCKER_REPO}:latest ."
                     } else {
@@ -111,7 +134,12 @@ pipeline {
 
         stage('Image Publish') {
             steps {
-                echo 'Authenticating with container registry using Jenkins credentials...'
+                script {
+                    if (!env.IMAGE_TAG || env.IMAGE_TAG == 'null' || env.IMAGE_TAG.trim() == '') {
+                        env.IMAGE_TAG = env.BUILD_NUMBER ?: 'latest'
+                    }
+                    echo "Authenticating with container registry and pushing ${env.DOCKER_REPO}:${env.IMAGE_TAG}..."
+                }
                 // Using withCredentials prevents password leakage in logs
                 withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}",
                                                  usernameVariable: 'DOCKER_USER',
@@ -135,7 +163,12 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo "Updating Kubernetes deployment '${env.K8S_DEPLOYMENT_NAME}' to image ${env.DOCKER_REPO}:${env.IMAGE_TAG}..."
+                script {
+                    if (!env.IMAGE_TAG || env.IMAGE_TAG == 'null' || env.IMAGE_TAG.trim() == '') {
+                        env.IMAGE_TAG = env.BUILD_NUMBER ?: 'latest'
+                    }
+                    echo "Updating Kubernetes deployment '${env.K8S_DEPLOYMENT_NAME}' to image ${env.DOCKER_REPO}:${env.IMAGE_TAG}..."
+                }
                 // Authenticates to Kubernetes cluster using Jenkins Secret File or Kubeconfig
                 withCredentials([file(credentialsId: "${env.KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
                     script {
@@ -189,7 +222,7 @@ pipeline {
         success {
             echo "=================================================================="
             echo "PIPELINE COMPLETED SUCCESSFULLY!"
-            echo "Application version '${env.IMAGE_TAG}' is running in Kubernetes."
+            echo "Application image '${env.DOCKER_REPO}:${env.IMAGE_TAG}' is running in Kubernetes."
             echo "=================================================================="
         }
         failure {
